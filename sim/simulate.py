@@ -174,12 +174,13 @@ def seg7_visualize(bcd):
     e = "|" if (seg >> 2) & 1 == 0 else " "
     c = "|" if (seg >> 4) & 1 == 0 else " "
 
+    d = " --- " if (seg >> 3) & 1 == 0 else "     "
     lines = [
         f"  {a}",
-        f" {f}   {b}",
+        f"  {f}   {b}",
         f"  {g}",
-        f" {e}   {c}",
-        f"  {a.replace('---','   ')}",
+        f"  {e}   {c}",
+        f"  {d}",
     ]
     return "\n".join(lines)
 
