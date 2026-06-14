@@ -48,16 +48,19 @@ module tb_top_module;
     // ========================================================================
     // 参考模型：期望的学号数字序列
     // ========================================================================
+    // 期望序列（复位后第一次 clk_1hz 上升沿后 pos=1，故从 student_id[1] 开始）
+    //                     pos: 1  2  3  4  5  6  7  0
     reg [3:0] expected_digit [0:7];
+    reg [2:0] expected_pos   [0:7];
     initial begin
-        expected_digit[0] = 4'd2;  // 位置0: 2
-        expected_digit[1] = 4'd0;  // 位置1: 0
-        expected_digit[2] = 4'd2;  // 位置2: 2
-        expected_digit[3] = 4'd5;  // 位置3: 5
-        expected_digit[4] = 4'd1;  // 位置4: 1
-        expected_digit[5] = 4'd6;  // 位置5: 6
-        expected_digit[6] = 4'd9;  // 位置6: 9
-        expected_digit[7] = 4'd8;  // 位置7: 8
+        expected_digit[0] = 4'd0;  expected_pos[0] = 3'd1;
+        expected_digit[1] = 4'd2;  expected_pos[1] = 3'd2;
+        expected_digit[2] = 4'd5;  expected_pos[2] = 3'd3;
+        expected_digit[3] = 4'd1;  expected_pos[3] = 3'd4;
+        expected_digit[4] = 4'd6;  expected_pos[4] = 3'd5;
+        expected_digit[5] = 4'd9;  expected_pos[5] = 3'd6;
+        expected_digit[6] = 4'd8;  expected_pos[6] = 3'd7;
+        expected_digit[7] = 4'd2;  expected_pos[7] = 3'd0;
     end
 
     // ========================================================================
@@ -156,8 +159,8 @@ module tb_top_module;
                     error_count = error_count + 1;
                 end
                 // 验证位置索引
-                if (pos !== i[2:0]) begin
-                    $write("  [FAIL] 位置索引不匹配！（期望=%0d, 实际=%0d）", i[2:0], pos);
+                if (pos !== expected_pos[i]) begin
+                    $write("  [FAIL] 位置索引不匹配！（期望=%0d, 实际=%0d）", expected_pos[i], pos);
                     error_count = error_count + 1;
                 end
                 // 验证七段译码
@@ -176,17 +179,17 @@ module tb_top_module;
         // ------------------------------------------------------------------
         $display("");
         $display("[TEST 3] 自动循环验证");
-        $display("  验证系统是否自动从位置7返回位置0...");
+        $display("  验证系统是否从位置0继续循环到位置1...");
 
-        // 等待下一轮的第一个数字
+        // 前两轮结束于 pos=0（已由 Test 2 覆盖），此处验证循环继续进入下一轮
         wait_posedge_clk_out();
         #(CLK_PERIOD);
         @(negedge clk);
 
-        if (digit_out === 4'd2 && pos === 3'd0) begin
-            $display("  [PASS] 系统已自动返回位置0，循环运行正常。");
+        if (digit_out === 4'd0 && pos === 3'd1) begin
+            $display("  [PASS] 系统继续循环进入下一轮 (pos=1, digit=0)。");
         end else begin
-            $display("  [FAIL] 自动循环失败！期望 digit=2, pos=0，实际 digit=%0d, pos=%0d",
+            $display("  [FAIL] 自动循环失败！期望 digit=0, pos=1，实际 digit=%0d, pos=%0d",
                      digit_out, pos);
             error_count = error_count + 1;
         end
@@ -218,7 +221,7 @@ module tb_top_module;
         wait_posedge_clk_out();
         #(CLK_PERIOD);
         @(negedge clk);
-        if (digit_out === 4'd2 && pos === 3'd0) begin
+        if (digit_out === 4'd0 && pos === 3'd1) begin
             $display("  [PASS] 复位后系统可正常重新开始运行。");
         end else begin
             $display("  [FAIL] 复位后运行异常！");
@@ -230,7 +233,7 @@ module tb_top_module;
         // ------------------------------------------------------------------
         $display("");
         $display("[TEST 5] 七段数码管译码完全性检查");
-        begin
+        begin : seg_test_block
             reg [3:0] test_val;
             integer seg_ok;
             seg_ok = 1;
@@ -263,14 +266,11 @@ module tb_top_module;
 
     // ========================================================================
     // 辅助任务：等待分频器输出时钟的上升沿
-    // 通过监视pos信号的变化来检测显示切换时刻
+    // 通过层次化引用直接监视 clk_1hz 信号
     // ========================================================================
     task wait_posedge_clk_out;
         begin
-            // 等待 pos 发生变化（表示分频器产生了新的上升沿）
-            // 仿真参数：CLK_FREQ=4, TARGET_FREQ=1
-            // 每4个系统时钟周期发生一次切换
-            repeat (SIM_CLK_FREQ / SIM_TARGET_FREQ) @(posedge clk);
+            @(posedge u_dut.clk_1hz);  // 直接等待真正的 1Hz 时钟上升沿
         end
     endtask
 
